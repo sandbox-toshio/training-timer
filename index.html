@@ -211,7 +211,16 @@
     if (audioCtx) return;
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    try { audioCtx = new AC(); } catch (e) {}
+    try {
+      audioCtx = new AC();
+      // iOS Safari requires a real audio trigger (not just resume()) during
+      // the user gesture to unlock the audio system. Play a silent buffer.
+      var buf = audioCtx.createBuffer(1, 1, 22050);
+      var src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch (e) {}
   }
 
   // resume() is async — run fn() only after context is actually running
