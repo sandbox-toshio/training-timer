@@ -195,23 +195,23 @@
 
 <script>
 (function () {
-  const elTime     = document.getElementById('time-display');
-  const elPhase    = document.getElementById('phase-label');
-  const elProgress = document.getElementById('set-progress');
-  const elBar      = document.getElementById('progress-bar');
-  const btnStart   = document.getElementById('btn-start');
-  const btnReset   = document.getElementById('btn-reset');
-  const inpWork    = document.getElementById('inp-work');
-  const inpRest    = document.getElementById('inp-rest');
-  const inpSets    = document.getElementById('inp-sets');
+  var elTime     = document.getElementById('time-display');
+  var elPhase    = document.getElementById('phase-label');
+  var elProgress = document.getElementById('set-progress');
+  var elBar      = document.getElementById('progress-bar');
+  var btnStart   = document.getElementById('btn-start');
+  var btnReset   = document.getElementById('btn-reset');
+  var inpWork    = document.getElementById('inp-work');
+  var inpRest    = document.getElementById('inp-rest');
+  var inpSets    = document.getElementById('inp-sets');
 
-  // AudioContext-based beep — all audio is wrapped in try/catch so
-  // any failure (unsupported API, policy block, etc.) never stops the timer.
-  let audioCtx = null;
+  var audioCtx = null;
 
   function unlockAudio() {
     try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
       if (audioCtx.state === 'suspended') audioCtx.resume();
     } catch (e) { audioCtx = null; }
   }
@@ -219,9 +219,9 @@
   function tone(freq, startTime, duration, volume, type) {
     try {
       if (!audioCtx) return;
-      type = type || 'square';
-      const osc  = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      if (!type) type = 'square';
+      var osc  = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.type = type;
@@ -240,8 +240,8 @@
       unlockAudio();
       if (!audioCtx) return;
       var t = audioCtx.currentTime;
-      tone(880, t,        0.12, 0.5);
-      tone(880, t + 0.18, 0.12, 0.5);
+      tone(880,  t,        0.12, 0.5);
+      tone(880,  t + 0.18, 0.12, 0.5);
       tone(1100, t + 0.36, 0.35, 0.6);
     } catch (e) {}
   }
@@ -276,45 +276,46 @@
     } catch (e) {}
   }
 
-  // State
-  let workSec, restSec, totalSets;
-  let currentSet  = 0;
-  let phase       = 'idle'; // idle | work | rest | done
-  let remaining   = 0;
-  let phaseDur    = 0;
-  let running     = false;
-  let intervalId  = null;
+  var workSec, restSec, totalSets;
+  var currentSet = 0;
+  var phase      = 'idle';
+  var remaining  = 0;
+  var phaseDur   = 0;
+  var running    = false;
+  var intervalId = null;
 
   function getSettings() {
-    workSec   = Math.max(1,  parseInt(inpWork.value)  || 30);
-    restSec   = Math.max(0,  parseInt(inpRest.value)  || 10);
-    totalSets = Math.max(1,  parseInt(inpSets.value)  || 5);
+    workSec   = Math.max(1, parseInt(inpWork.value) || 30);
+    restSec   = Math.max(0, parseInt(inpRest.value) || 10);
+    totalSets = Math.max(1, parseInt(inpSets.value) || 5);
+  }
+
+  function pad2(n) {
+    return n < 10 ? '0' + n : '' + n;
   }
 
   function formatTime(s) {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return m > 0 ? `${m}:${String(sec).padStart(2,'0')}` : String(sec);
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return m > 0 ? m + ':' + pad2(sec) : '' + sec;
   }
 
   function render() {
-    const cls = phase === 'idle' ? 'idle' : phase === 'work' ? 'work' : phase === 'rest' ? 'rest' : 'done';
+    var cls = phase === 'idle' ? 'idle' : phase === 'work' ? 'work' : phase === 'rest' ? 'rest' : 'done';
 
     elTime.textContent  = phase === 'idle' ? '--' : phase === 'done' ? 'DONE' : formatTime(remaining);
-    elTime.className    = `time ${cls}`;
-    elPhase.className   = `phase-label ${cls}`;
-    elPhase.textContent =
-      phase === 'idle' ? 'READY' :
-      phase === 'work' ? 'WORK'  :
-      phase === 'rest' ? 'REST'  : 'COMPLETE';
+    elTime.className    = 'time ' + cls;
+    elPhase.className   = 'phase-label ' + cls;
+    elPhase.textContent = phase === 'idle' ? 'READY' : phase === 'work' ? 'WORK' : phase === 'rest' ? 'REST' : 'COMPLETE';
 
-    elProgress.textContent = phase === 'idle' ? `0 / ${totalSets || inpSets.value}` :
-                             phase === 'done' ? `${totalSets} / ${totalSets}` :
-                             `${currentSet} / ${totalSets}`;
+    var tot = totalSets || parseInt(inpSets.value) || 0;
+    elProgress.textContent = phase === 'idle' ? '0 / ' + tot :
+                             phase === 'done' ? totalSets + ' / ' + totalSets :
+                             currentSet + ' / ' + totalSets;
 
-    const pct = phaseDur > 0 ? (remaining / phaseDur) * 100 : 100;
-    elBar.style.width = `${pct}%`;
-    elBar.className   = `progress-bar ${phase === 'rest' ? 'rest' : ''}`;
+    var pct = phaseDur > 0 ? (remaining / phaseDur) * 100 : 100;
+    elBar.style.width = pct + '%';
+    elBar.className   = 'progress-bar' + (phase === 'rest' ? ' rest' : '');
 
     btnStart.textContent = running ? 'PAUSE' : (phase === 'idle' || phase === 'done') ? 'START' : 'RESUME';
   }
@@ -323,8 +324,7 @@
     phase     = p;
     phaseDur  = p === 'work' ? workSec : restSec;
     remaining = phaseDur;
-    if (p === 'work') beepWork();
-    else              beepRest();
+    if (p === 'work') beepWork(); else beepRest();
   }
 
   function tick() {
@@ -337,7 +337,6 @@
   function onPhaseEnd() {
     if (phase === 'work') {
       if (currentSet >= totalSets) {
-        // All sets done
         clearInterval(intervalId);
         intervalId = null;
         running = false;
@@ -350,7 +349,6 @@
       if (restSec > 0) {
         startPhase('rest');
       } else {
-        // No rest — go straight to next set
         currentSet++;
         startPhase('work');
       }
@@ -370,7 +368,6 @@
   function doStart() {
     try { unlockAudio(); } catch (e) {}
     if (phase === 'idle' || phase === 'done') {
-      // Fresh start
       getSettings();
       currentSet = 1;
       startPhase('work');
@@ -389,8 +386,8 @@
   function doReset() {
     clearInterval(intervalId);
     intervalId = null;
-    running  = false;
-    phase    = 'idle';
+    running    = false;
+    phase      = 'idle';
     currentSet = 0;
     remaining  = 0;
     phaseDur   = 0;
@@ -399,20 +396,19 @@
     render();
   }
 
-  btnStart.addEventListener('click', () => {
+  btnStart.addEventListener('click', function () {
     if (running) doPause(); else doStart();
   });
 
   btnReset.addEventListener('click', doReset);
 
-  // Update display when settings change while idle
-  ['inp-work','inp-rest','inp-sets'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
+  var inputIds = ['inp-work', 'inp-rest', 'inp-sets'];
+  for (var i = 0; i < inputIds.length; i++) {
+    document.getElementById(inputIds[i]).addEventListener('input', function () {
       if (phase === 'idle') { getSettings(); render(); }
     });
-  });
+  }
 
-  // Init
   getSettings();
   render();
 })();
