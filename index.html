@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>トレーニングタイマー</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      letter-spacing: 0.15em;
+      color: #a0aec0;
+      text-transform: uppercase;
+    }
+
+    /* Settings */
+    .settings {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .setting-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .setting-group label {
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #718096;
+    }
+
+    .setting-group input {
+      width: 80px;
+      padding: 8px;
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: bold;
+      background: #2d3748;
+      color: #e2e8f0;
+      border: 2px solid #4a5568;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .setting-group input:focus {
+      border-color: #63b3ed;
+    }
+
+    /* Timer display */
+    .timer-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .phase-label {
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      height: 1.4em;
+      transition: color 0.3s;
+    }
+
+    .phase-label.work  { color: #68d391; }
+    .phase-label.rest  { color: #63b3ed; }
+    .phase-label.idle  { color: #718096; }
+    .phase-label.done  { color: #f6ad55; }
+
+    .time {
+      font-size: 7rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      transition: color 0.3s;
+      min-width: 4ch;
+      text-align: center;
+    }
+
+    .time.work { color: #68d391; }
+    .time.rest { color: #63b3ed; }
+    .time.idle { color: #e2e8f0; }
+    .time.done { color: #f6ad55; }
+
+    .set-progress {
+      font-size: 1.1rem;
+      color: #718096;
+      letter-spacing: 0.08em;
+    }
+
+    /* Progress bar */
+    .progress-bar-wrap {
+      width: 320px;
+      height: 8px;
+      background: #2d3748;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 100%;
+      border-radius: 99px;
+      transition: width 0.5s linear, background-color 0.3s;
+      background: #68d391;
+    }
+
+    .progress-bar.rest { background: #63b3ed; }
+
+    /* Buttons */
+    .controls {
+      display: flex;
+      gap: 16px;
+    }
+
+    button {
+      padding: 14px 32px;
+      font-size: 1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    button:active { transform: scale(0.96); }
+    button:disabled { opacity: 0.35; cursor: default; }
+
+    #btn-start {
+      background: #48bb78;
+      color: #1a1a2e;
+      min-width: 120px;
+    }
+
+    #btn-reset {
+      background: #2d3748;
+      color: #a0aec0;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Training Timer</h1>
+
+<div class="settings">
+  <div class="setting-group">
+    <label>Work (sec)</label>
+    <input type="number" id="inp-work" value="30" min="1" max="3600">
+  </div>
+  <div class="setting-group">
+    <label>Rest (sec)</label>
+    <input type="number" id="inp-rest" value="10" min="0" max="3600">
+  </div>
+  <div class="setting-group">
+    <label>Sets</label>
+    <input type="number" id="inp-sets" value="5" min="1" max="99">
+  </div>
+</div>
+
+<div class="timer-display">
+  <div class="phase-label idle" id="phase-label">READY</div>
+  <div class="time idle" id="time-display">--</div>
+  <div class="set-progress" id="set-progress">0 / 0</div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar" style="width:100%"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="btn-start">START</button>
+  <button id="btn-reset">RESET</button>
+</div>
+
+<script>
+(function () {
+  const elTime     = document.getElementById('time-display');
+  const elPhase    = document.getElementById('phase-label');
+  const elProgress = document.getElementById('set-progress');
+  const elBar      = document.getElementById('progress-bar');
+  const btnStart   = document.getElementById('btn-start');
+  const btnReset   = document.getElementById('btn-reset');
+  const inpWork    = document.getElementById('inp-work');
+  const inpRest    = document.getElementById('inp-rest');
+  const inpSets    = document.getElementById('inp-sets');
+
+  // AudioContext-based beep
+  let audioCtx = null;
+
+  function beep(freq, duration, volume) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  function beepWork() { beep(880, 0.18, 0.6); setTimeout(() => beep(880, 0.18, 0.6), 220); }
+  function beepRest() { beep(523, 0.3, 0.5); }
+  function beepDone() {
+    beep(523, 0.15, 0.5);
+    setTimeout(() => beep(659, 0.15, 0.5), 180);
+    setTimeout(() => beep(784, 0.4,  0.6), 360);
+  }
+
+  // State
+  let workSec, restSec, totalSets;
+  let currentSet  = 0;
+  let phase       = 'idle'; // idle | work | rest | done
+  let remaining   = 0;
+  let phaseDur    = 0;
+  let running     = false;
+  let intervalId  = null;
+
+  function getSettings() {
+    workSec   = Math.max(1,  parseInt(inpWork.value)  || 30);
+    restSec   = Math.max(0,  parseInt(inpRest.value)  || 10);
+    totalSets = Math.max(1,  parseInt(inpSets.value)  || 5);
+  }
+
+  function formatTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}:${String(sec).padStart(2,'0')}` : String(sec);
+  }
+
+  function render() {
+    const cls = phase === 'idle' ? 'idle' : phase === 'work' ? 'work' : phase === 'rest' ? 'rest' : 'done';
+
+    elTime.textContent  = phase === 'idle' ? '--' : phase === 'done' ? 'DONE' : formatTime(remaining);
+    elTime.className    = `time ${cls}`;
+    elPhase.className   = `phase-label ${cls}`;
+    elPhase.textContent =
+      phase === 'idle' ? 'READY' :
+      phase === 'work' ? 'WORK'  :
+      phase === 'rest' ? 'REST'  : 'COMPLETE';
+
+    elProgress.textContent = phase === 'idle' ? `0 / ${totalSets || inpSets.value}` :
+                             phase === 'done' ? `${totalSets} / ${totalSets}` :
+                             `${currentSet} / ${totalSets}`;
+
+    const pct = phaseDur > 0 ? (remaining / phaseDur) * 100 : 100;
+    elBar.style.width = `${pct}%`;
+    elBar.className   = `progress-bar ${phase === 'rest' ? 'rest' : ''}`;
+
+    btnStart.textContent = running ? 'PAUSE' : (phase === 'idle' || phase === 'done') ? 'START' : 'RESUME';
+  }
+
+  function startPhase(p) {
+    phase     = p;
+    phaseDur  = p === 'work' ? workSec : restSec;
+    remaining = phaseDur;
+    if (p === 'work') beepWork();
+    else              beepRest();
+  }
+
+  function tick() {
+    if (!running) return;
+    remaining--;
+    render();
+    if (remaining <= 0) onPhaseEnd();
+  }
+
+  function onPhaseEnd() {
+    if (phase === 'work') {
+      if (currentSet >= totalSets) {
+        // All sets done
+        clearInterval(intervalId);
+        intervalId = null;
+        running = false;
+        phase   = 'done';
+        beepDone();
+        setInputsDisabled(false);
+        render();
+        return;
+      }
+      if (restSec > 0) {
+        startPhase('rest');
+      } else {
+        // No rest — go straight to next set
+        currentSet++;
+        startPhase('work');
+      }
+    } else if (phase === 'rest') {
+      currentSet++;
+      startPhase('work');
+    }
+    render();
+  }
+
+  function setInputsDisabled(disabled) {
+    inpWork.disabled = disabled;
+    inpRest.disabled = disabled;
+    inpSets.disabled = disabled;
+  }
+
+  function doStart() {
+    if (phase === 'idle' || phase === 'done') {
+      // Fresh start
+      getSettings();
+      currentSet = 1;
+      startPhase('work');
+      setInputsDisabled(true);
+    }
+    running = true;
+    if (!intervalId) intervalId = setInterval(tick, 1000);
+    render();
+  }
+
+  function doPause() {
+    running = false;
+    render();
+  }
+
+  function doReset() {
+    clearInterval(intervalId);
+    intervalId = null;
+    running  = false;
+    phase    = 'idle';
+    currentSet = 0;
+    remaining  = 0;
+    phaseDur   = 0;
+    getSettings();
+    setInputsDisabled(false);
+    render();
+  }
+
+  btnStart.addEventListener('click', () => {
+    if (running) doPause(); else doStart();
+  });
+
+  btnReset.addEventListener('click', doReset);
+
+  // Update display when settings change while idle
+  ['inp-work','inp-rest','inp-sets'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      if (phase === 'idle') { getSettings(); render(); }
+    });
+  });
+
+  // Init
+  getSettings();
+  render();
+})();
+</script>
+</body>
+</html>
