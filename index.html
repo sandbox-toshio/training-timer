@@ -258,23 +258,23 @@
   function beepWork() {
     withAudio(function () {
       var t = audioCtx.currentTime + 0.05;
-      tone(880,  t,        0.12, 0.5);
-      tone(880,  t + 0.18, 0.12, 0.5);
-      tone(1100, t + 0.36, 0.35, 0.6);
+      tone(659, t,        0.12, 0.5);
+      tone(659, t + 0.18, 0.12, 0.5);
+      tone(831, t + 0.36, 0.35, 0.6);
     });
   }
 
   function beepRest() {
     withAudio(function () {
       var t = audioCtx.currentTime + 0.05;
-      var soundDuration = restSec < 3 ? Math.max(0.1, restSec - 1) : 3;
-      var s = 1 / 1.5;
+      var soundDuration = restSec < 3 ? Math.max(0.1, restSec - 1) : 2;
+      var s = 0.5;
       var cycleLen = 0.71 * s;
       var offset = 0;
       while (offset + cycleLen <= soundDuration) {
-        tone(880,  t + offset,               0.12 * s, 0.5);
-        tone(880,  t + offset + 0.18 * s,    0.12 * s, 0.5);
-        tone(1100, t + offset + 0.36 * s,    0.35 * s, 0.6);
+        tone(659, t + offset,            0.12 * s, 0.5);
+        tone(659, t + offset + 0.18 * s, 0.12 * s, 0.5);
+        tone(831, t + offset + 0.36 * s, 0.35 * s, 0.6);
         offset += cycleLen;
       }
     });
@@ -283,10 +283,22 @@
   function beepDone() {
     withAudio(function () {
       var t = audioCtx.currentTime + 0.05;
-      tone(523,  t,        0.2,  0.45, 'sine');
-      tone(659,  t + 0.22, 0.2,  0.45, 'sine');
-      tone(784,  t + 0.44, 0.2,  0.5,  'sine');
-      tone(1047, t + 0.66, 0.55, 0.55, 'sine');
+      var step = 0.16;
+      // Ascending arpeggio: C4 → G4 → C5 → E5 → G5 → C6
+      tone(261,  t + step * 0, 0.18, 0.5,  'triangle');
+      tone(392,  t + step * 1, 0.18, 0.5,  'triangle');
+      tone(523,  t + step * 2, 0.18, 0.5,  'triangle');
+      tone(659,  t + step * 3, 0.18, 0.5,  'triangle');
+      tone(784,  t + step * 4, 0.18, 0.55, 'triangle');
+      tone(1047, t + step * 5, 0.18, 0.6,  'triangle');
+      // Trill G5 <-> C6
+      var trillStart = t + step * 6 + 0.05;
+      var trillStep  = 0.09;
+      for (var i = 0; i < 6; i++) {
+        tone(i % 2 === 0 ? 784 : 1047, trillStart + trillStep * i, 0.08, 0.55, 'triangle');
+      }
+      // Long final C6
+      tone(1047, trillStart + trillStep * 6 + 0.02, 0.8, 0.65, 'triangle');
     });
   }
 
